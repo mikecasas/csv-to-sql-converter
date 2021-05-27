@@ -143,7 +143,6 @@ namespace CsvToSqlConverter
                         LineStatement.AppendLine($"GO");
                         LineStatement.AppendLine($"BEGIN TRANSACTION;");
                         LineStatement.Append($"INSERT INTO [{tableName}] ({tableFields})");
-
                     }
                     else if (secondRowComplete == false)
                     {
@@ -216,7 +215,6 @@ namespace CsvToSqlConverter
             return v.Substring(0, (v.Length - 1));
         }
 
-
         private static string RemoveEndingUnderScore(string fieldName)
         {
             if (fieldName == null) return "";
@@ -249,8 +247,6 @@ namespace CsvToSqlConverter
             {
                 return finalField;
             }
-
         }
-
     }
 }
