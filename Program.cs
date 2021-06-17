@@ -8,26 +8,38 @@ namespace CsvToSqlConverter
     {
         static async Task Main(string[] args)
         {
+            var config = GetConfig();
+
+            string[] files = GetFiles(config);
+
+            await ProcessFiles(files, config);
+
+            Console.WriteLine("Processing Complete!");
+        }
+
+        private static FileUploadConfig GetConfig()
+        {
             var config = new FileUploadConfig();
 
             //config.FolderName = "C:\\Users\\mcasas\\Documents\\Munis-Financials\\csv";
+            //config.FolderName = "C:\\Users\\mcasas\\Desktop\\other\\covid-19-public-safety\\May-2021\\csv";
+            //config.FolderName = "C:\\Users\\mcasas\\Documents\\_energov\\LBTR";
 
-            config.FolderName = "C:\\Users\\mcasas\\Desktop\\other\\covid-19-public-safety\\May-2021\\csv";
+            config.FolderName = "C:\\Users\\mcasas\\Downloads";
 
+            //config.DatabaseName = "DBScppSpecialProjects";
+            //config.DatabaseName = "pembrokepines_SOURCE";
 
-            config.DatabaseName = "DBScppSpecialProjects";
+            config.DatabaseName = "td";
+
             config.IncludeDropCreateTable = true;
 
+            return config;
+        }
+
+        private static async Task ProcessFiles(string[] files, FileUploadConfig config)
+        {
             var B = new SqlContentBuilder();
-
-            //string[] files = { "apr-budget", "apr-actual" };
-
-            
-            //Option 1. List the files your self.
-            //string[] files = { "February.csv", "March.csv"};
-
-            //Option 2. Read them all from a folder
-            string[] files = Directory.GetFiles(config.FolderName);
 
             foreach (string i in files)
             {
@@ -36,10 +48,21 @@ namespace CsvToSqlConverter
 
                 string content = B.BuildCreateTable(config);
 
-                await File.WriteAllTextAsync($"{config.FolderName}\\{config.TableName + "-" + Guid.NewGuid().ToString()}.sql", content);
+                //await File.WriteAllTextAsync($"{config.FolderName}\\{config.TableName + "-" + Guid.NewGuid().ToString()}.sql", content);
+                await File.WriteAllTextAsync($"{config.FolderName}\\{config.TableName}.sql", content);
             }
+        }
 
-            Console.WriteLine("Processing Complete!");
+        private static string[] GetFiles(FileUploadConfig config)
+        {
+            //Option 1. List the files your self.
+            //string[] files = { "February.csv", "March.csv"};
+            string[] files = { "M.csv"};
+
+            //Option 2. Read them all from a folder
+            //string[] files = Directory.GetFiles(config.FolderName);
+
+            return files;
         }
     }
 }
