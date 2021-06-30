@@ -127,6 +127,7 @@ namespace CsvToSqlConverter
             int batchNbr = 500;
             int cnter = 0;
 
+            BatchSql.Append(BuildFirstRow(dbName, tableName, tableFields));
             using (Microsoft.VisualBasic.FileIO.TextFieldParser parser = new Microsoft.VisualBasic.FileIO.TextFieldParser(completeFilePath))
             {
 
@@ -191,6 +192,18 @@ namespace CsvToSqlConverter
                 }
             }
             return BatchSql.ToString();
+        }
+
+        private static string BuildFirstRow(string dbName, string tableName, string tableFields)
+        {
+            StringBuilder sb = new StringBuilder();
+
+            sb.AppendLine($"USE {dbName}");
+            sb.AppendLine($"GO");
+            sb.AppendLine($"BEGIN TRANSACTION;");
+            sb.Append($"INSERT INTO [{tableName}] ({tableFields})");
+
+            return sb.ToString();
         }
 
         private static string Mike(IEnumerable<string> flds)
