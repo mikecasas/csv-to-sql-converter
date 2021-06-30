@@ -70,6 +70,7 @@ namespace CsvToSqlConverter
 
                     newName = newName.Replace("%", "_percent_");
                     newName = newName.Replace("\"", "_");
+                    newName = newName.Replace("/", "_");
                     newName = newName.Replace("$", "_dollar_");
                     newName = newName.Replace("&", "_and_");
                     newName = newName.Replace("(", "_");
