@@ -53,6 +53,11 @@ namespace CsvToSqlConverter
             }
         }
 
+        /// <summary>
+        /// Get csv files to convert
+        /// </summary>
+        /// <param name="config"></param>
+        /// <returns></returns>
         private static string[] GetFiles(FileUploadConfig config)
         {
             //Option 1. List the files your self.
