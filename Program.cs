@@ -23,14 +23,14 @@ namespace CsvToSqlConverter
 
             //config.FolderName = "C:\\Users\\mcasas\\Documents\\Munis-Financials\\csv";
             //config.FolderName = "C:\\Users\\mcasas\\Desktop\\other\\covid-19-public-safety\\May-2021\\csv";
-            //config.FolderName = "C:\\Users\\mcasas\\Documents\\_energov\\LBTR";
+            config.FolderName = "C:\\Users\\mcasas\\Documents\\_energov\\LBTR";
 
-            config.FolderName = "C:\\Users\\mcasas\\Downloads";
+            //config.FolderName = "C:\\Users\\mcasas\\Downloads";
 
             //config.DatabaseName = "DBScppSpecialProjects";
-            //config.DatabaseName = "pembrokepines_SOURCE";
+            config.DatabaseName = "pembrokepines_SOURCE";
 
-            config.DatabaseName = "td";
+            //config.DatabaseName = "td";
 
             config.IncludeDropCreateTable = true;
 
