@@ -128,16 +128,18 @@ namespace CsvToSqlConverter
             int cnter = 0;
 
             BatchSql.Append(BuildFirstRow(dbName, tableName, tableFields));
+
             using (Microsoft.VisualBasic.FileIO.TextFieldParser parser = new Microsoft.VisualBasic.FileIO.TextFieldParser(completeFilePath))
             {
-
                 parser.TextFieldType = Microsoft.VisualBasic.FileIO.FieldType.Delimited;
                 parser.SetDelimiters(",");
+
                 while (!parser.EndOfData)
                 {
                     StringBuilder LineStatement = new StringBuilder();
 
                     string[] fields = parser.ReadFields();
+                                     
 
                     if (FirstRow)
                     {
