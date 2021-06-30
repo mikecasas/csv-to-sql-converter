@@ -60,7 +60,7 @@ namespace CsvToSqlConverter
             string[] files = { "M.csv"};
 
             //Option 2. Read them all from a folder
-            //string[] files = Directory.GetFiles(config.FolderName);
+            string[] files = Directory.GetFiles(config.FolderName, "*.csv");
 
             return files;
         }
