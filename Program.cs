@@ -62,7 +62,7 @@ namespace CsvToSqlConverter
         {
             //Option 1. List the files your self.
             //string[] files = { "February.csv", "March.csv"};
-            string[] files = { "M.csv"};
+            //string[] files = { "M.csv"};
 
             //Option 2. Read them all from a folder
             string[] files = Directory.GetFiles(config.FolderName, "*.csv");
