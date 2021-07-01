@@ -125,8 +125,6 @@ namespace CsvToSqlConverter
             int cnter = 0;
             int TotalCounter = 0;
 
-            //BatchSql.Append(BuildFirstRow(dbName, tableName, tableFields));
-
             using (Microsoft.VisualBasic.FileIO.TextFieldParser parser = new Microsoft.VisualBasic.FileIO.TextFieldParser(completeFilePath))
             {
                 parser.TextFieldType = Microsoft.VisualBasic.FileIO.FieldType.Delimited;
@@ -184,17 +182,7 @@ namespace CsvToSqlConverter
 
                         //BatchSql.Clear();
                     }
-                }
-
-                //////see if the file ended exactly on the batch number
-                ////if (cnter == batchNbr)
-                ////{
-                ////    //do nothing
-                ////}
-                ////else
-                ////{
-                ////    BatchSql.AppendLine($"COMMIT;");
-                ////}
+                }             
             }
 
             if((TotalCounter % batchNbr) == 0)
@@ -204,9 +192,6 @@ namespace CsvToSqlConverter
             {
                 BatchSql.AppendLine("COMMIT;");
             }
-
-
-
 
             return BatchSql.ToString();
         }
