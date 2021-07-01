@@ -8,6 +8,8 @@ namespace CsvToSqlConverter
 {
     public class SqlContentBuilder
     {
+        private static int batchNbr = 750;
+
         public string BuildCreateTable(FileUploadConfig config)
         {
             string MyFile = $"{config.FolderName}\\{config.FileName}";
@@ -119,52 +121,53 @@ namespace CsvToSqlConverter
 
         private static string ParseContent(string completeFilePath, string dbName, string tableName, string tableFields)
         {
-            StringBuilder BatchSql = new StringBuilder();
-
-            bool FirstRow = true;
-            bool secondRowComplete = false;
-
-            int batchNbr = 500;
+            StringBuilder BatchSql = new StringBuilder();                     
             int cnter = 0;
+            int TotalCounter = 0;
 
-            BatchSql.Append(BuildFirstRow(dbName, tableName, tableFields));
+            //BatchSql.Append(BuildFirstRow(dbName, tableName, tableFields));
 
             using (Microsoft.VisualBasic.FileIO.TextFieldParser parser = new Microsoft.VisualBasic.FileIO.TextFieldParser(completeFilePath))
             {
                 parser.TextFieldType = Microsoft.VisualBasic.FileIO.FieldType.Delimited;
                 parser.SetDelimiters(",");
 
+                bool firstLine = true;
+                bool secondRowComplete = false;
+
                 while (!parser.EndOfData)
                 {
                     StringBuilder LineStatement = new StringBuilder();
 
                     string[] fields = parser.ReadFields();
-                                     
-
-                    if (FirstRow)
+                                        
+                    if (firstLine)
                     {
-                        LineStatement.AppendLine($"USE {dbName}");
-                        LineStatement.AppendLine($"GO");
-                        LineStatement.AppendLine($"BEGIN TRANSACTION;");
-                        LineStatement.Append($"INSERT INTO [{tableName}] ({tableFields})");
-                    }
-                    else if (secondRowComplete == false)
+                        firstLine = false;
+                        continue;
+                    } else
                     {
-                        LineStatement.Append($" SELECT ");
-                        string rowX = Mike(fields);
-                        LineStatement.AppendLine($"{rowX}");
+                        if (secondRowComplete == false)
+                        {
+                          
+                            LineStatement.AppendLine("");
+                            LineStatement.AppendLine(BuildFirstRow(dbName,tableName,tableFields));
+                            
+                            LineStatement.Append($" SELECT ");
+                            string rowX = Mike(fields);
+                            LineStatement.AppendLine($"{rowX}");
 
-                        secondRowComplete = true;
-                    }
-                    else
-                    {
-                        LineStatement.Append($" UNION ALL SELECT ");
-                        string rowZ = Mike(fields);
-                        LineStatement.AppendLine($"{rowZ}");
+                            secondRowComplete = true;
+                        } else
+                        {
+                            LineStatement.Append($" UNION ALL SELECT ");
+                            string rowZ = Mike(fields);
+                            LineStatement.AppendLine($"{rowZ}");
+                        }
                     }
 
-                    FirstRow = false;
                     cnter += 1;
+                    TotalCounter += 1;
 
                     BatchSql.Append(LineStatement);
 
@@ -173,7 +176,7 @@ namespace CsvToSqlConverter
                         BatchSql.AppendLine($"COMMIT;");
 
                         //string jjj = Guid.NewGuid().ToString();
-                        FirstRow = true;
+                        firstLine = true;
                         secondRowComplete = false;
                         cnter = 0;
 
@@ -183,16 +186,28 @@ namespace CsvToSqlConverter
                     }
                 }
 
-                //see if the file ended exactly on the batch number
-                if (cnter == batchNbr)
-                {
-                    //do nothing
-                }
-                else
-                {
-                    BatchSql.AppendLine($"COMMIT;");
-                }
+                //////see if the file ended exactly on the batch number
+                ////if (cnter == batchNbr)
+                ////{
+                ////    //do nothing
+                ////}
+                ////else
+                ////{
+                ////    BatchSql.AppendLine($"COMMIT;");
+                ////}
             }
+
+            if((TotalCounter % batchNbr) == 0)
+            {
+                //do nothing, it ends on a good number
+            } else
+            {
+                BatchSql.AppendLine("COMMIT;");
+            }
+
+
+
+
             return BatchSql.ToString();
         }
 
@@ -200,8 +215,8 @@ namespace CsvToSqlConverter
         {
             StringBuilder sb = new StringBuilder();
 
-            sb.AppendLine($"USE {dbName}");
-            sb.AppendLine($"GO");
+            //sb.AppendLine($"USE {dbName}");
+            //sb.AppendLine($"GO");
             sb.AppendLine($"BEGIN TRANSACTION;");
             sb.Append($"INSERT INTO [{tableName}] ({tableFields})");
 
@@ -264,5 +279,8 @@ namespace CsvToSqlConverter
                 return finalField;
             }
         }
+
+
+       
     }
 }
