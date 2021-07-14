@@ -17,5 +17,8 @@ namespace CsvToSqlConverter
 
         public bool AddEmptyField { get; set; }
         public bool IncludeDropCreateTable { get; set; }
+
+
+        public string CompleteFileName { get { return $"{FolderName}\\{FileName}";  } }
     }
 }
