@@ -124,62 +124,55 @@ namespace CsvToSqlConverter
             StringBuilder BatchSql = new StringBuilder();                     
             int cnter = 0;
             int TotalCounter = 0;
+            bool HeaderRow = true;
+            var FirstRow = BuildFirstRow(dbName, tableName, tableFields);
 
             using (Microsoft.VisualBasic.FileIO.TextFieldParser parser = new Microsoft.VisualBasic.FileIO.TextFieldParser(completeFilePath))
             {
                 parser.TextFieldType = Microsoft.VisualBasic.FileIO.FieldType.Delimited;
                 parser.SetDelimiters(",");
 
-                bool firstLine = true;
-                bool secondRowComplete = false;
+                bool FirstRowOfBatch = true;
 
                 while (!parser.EndOfData)
                 {
-                    StringBuilder LineStatement = new StringBuilder();
+                    StringBuilder LS = new StringBuilder();
 
                     string[] fields = parser.ReadFields();
-                                        
-                    if (firstLine)
-                    {
-                        firstLine = false;
-                        continue;
-                    } else
-                    {
-                        if (secondRowComplete == false)
-                        {
-                          
-                            LineStatement.AppendLine("");
-                            LineStatement.AppendLine(BuildFirstRow(dbName,tableName,tableFields));
-                            
-                            LineStatement.Append($" SELECT ");
-                            string rowX = Mike(fields);
-                            LineStatement.AppendLine($"{rowX}");
 
-                            secondRowComplete = true;
-                        } else
-                        {
-                            LineStatement.Append($" UNION ALL SELECT ");
-                            string rowZ = Mike(fields);
-                            LineStatement.AppendLine($"{rowZ}");
-                        }
+                    if (HeaderRow)
+                    {
+                        HeaderRow = false;
+                        continue;
                     }
+                    else
+                    {
+                        if (FirstRowOfBatch)
+                        {
+                            LS.AppendLine("");
+                            LS.AppendLine(FirstRow);
+                            LS.Append(SelectRow(fields));
+
+                            FirstRowOfBatch = false;
+                        }else
+                        {
+                            LS.Append(" UNION ALL" + SelectRow(fields));
+                        }
+                    }                                       
 
                     cnter += 1;
                     TotalCounter += 1;
 
-                    BatchSql.Append(LineStatement);
+                    BatchSql.Append(LS);
 
                     if (cnter == batchNbr)
                     {
                         BatchSql.AppendLine($"COMMIT;");
-
-                        //string jjj = Guid.NewGuid().ToString();
-                        firstLine = true;
-                        secondRowComplete = false;
+                        FirstRowOfBatch = true;
                         cnter = 0;
 
+                        //string jjj = Guid.NewGuid().ToString();
                         //File.AppendAllText("C:\\Users\\mc\\Desktop\\mike.sql", BatchSql.ToString());
-
                         //BatchSql.Clear();
                     }
                 }             
@@ -277,7 +270,52 @@ namespace CsvToSqlConverter
             }
         }
 
+        public async Task<IEnumerable<string>> HandleBigFile(FileUploadConfig config)
+        {
+            int RowLimit = 15;
+            long LineCount = File.ReadLines(config.CompleteFileName).Count();
+            int FileCounter = 1;
+            StringBuilder SqlStatement = new StringBuilder();
 
-       
+            bool NeedHeaders = false;
+
+            var ProcessedFiles = new List<string>();
+
+            string line1 = File.ReadLines(config.CompleteFileName).First();
+            string TableFields = GetFields(line1, config.AddEmptyField);
+
+            var sb = ParseContent(config.CompleteFileName, config.DatabaseName, config.TableName, TableFields);
+
+            string[] stringArray = sb.ToString().Split("\r\n").ToArray();
+
+            for (int i = 0; i < stringArray.Length; i++)
+            {
+                if (NeedHeaders)
+                {
+                    SqlStatement.AppendLine("88888888888888888");
+                    NeedHeaders = false;
+                }
+
+                string s = stringArray[i];
+
+                SqlStatement.AppendLine(s);
+
+                if (i == (RowLimit*FileCounter))
+                {
+                    SqlStatement.AppendLine("End it here");
+
+                    string fn = $"{config.TableName }-{ FileCounter}";
+
+                    await File.WriteAllTextAsync($"{config.FolderName}\\{fn}.sql", SqlStatement.ToString());
+                    FileCounter++;
+                    SqlStatement.Clear();
+                    ProcessedFiles.Add(fn);
+
+                    NeedHeaders = true;
+                }               
+            }
+
+            return ProcessedFiles;
+        }
     }
 }
