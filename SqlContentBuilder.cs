@@ -196,6 +196,18 @@ namespace CsvToSqlConverter
             return BatchSql.ToString();
         }
 
+
+        private static string SelectRow(string[] fields)
+        {
+            StringBuilder LS = new StringBuilder();
+
+            LS.Append($" SELECT ");
+            string rowX = Mike(fields);
+            LS.AppendLine($"{rowX}");
+
+            return LS.ToString();
+        }
+
         private static string BuildFirstRow(string dbName, string tableName, string tableFields)
         {
             StringBuilder sb = new StringBuilder();
