@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.Text;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace CsvToSqlConverter
 {
     public class SqlContentBuilder
     {
-        private static int batchNbr = 750;
+        private static int batchNbr = 950;
 
         public string BuildCreateTable(FileUploadConfig config)
         {
