@@ -26,13 +26,13 @@ namespace CsvToSqlConverter
         {
             var config = new FileUploadConfig();
 
-            //config.FolderName = "C:\\Users\\mcasas\\Documents\\Munis-Financials\\csv";
-            //config.FolderName = "C:\\Users\\mcasas\\Desktop\\other\\covid-19-public-safety\\May-2021\\csv";
-            //config.FolderName = "C:\\Users\\mcasas\\Documents\\_energov\\LBTR";
+            const string A = "C:\\Users\\mcasas\\";
 
-            config.FolderName = "C:\\Users\\mcasas\\Desktop\\test";
-
-            //config.FolderName = "C:\\Users\\mcasas\\Downloads";
+            //config.FolderName = A + "Documents\\Munis-Financials\\csv";
+            //config.FolderName = A + "Desktop\\other\\covid-19-public-safety\\May-2021\\csv";
+            config.FolderName = A + "Documents\\_energov\\LBTR";
+            //config.FolderName = A + "Desktop\\test";
+            //config.FolderName = A + "Downloads";
 
             //config.DatabaseName = "DBScppSpecialProjects";
             config.DatabaseName = "pembrokepines_SOURCE";
@@ -51,32 +51,7 @@ namespace CsvToSqlConverter
 
             foreach (string i in files)
             {
-                long limit = 25000000; //25 Megs
-
-                FileInfo fi = new FileInfo(i);
-                long size = fi.Length;
-
-                config.FileName = Path.GetFileName(i); // Not needed + ".csv";
-                config.TableName = Path.GetFileNameWithoutExtension(i).Replace(" ", "-");
-
-                if (size > limit)
-                {
-                    ProcessedFiles.AddRange(await B.HandleBigFile(config));
-
-                    //string content = B.BuildCreateTable(config);
-                    //await File.WriteAllTextAsync($"{config.FolderName}\\{config.TableName}.sql", content);
-
-                    //ProcessedFiles.Add(config.TableName);
-
-
-                } else
-                {               
-
-                    string content = B.BuildCreateTable(config);
-                    await File.WriteAllTextAsync($"{config.FolderName}\\{config.TableName}.sql", content);
-
-                    ProcessedFiles.Add(config.TableName);
-                }
+                ProcessedFiles.AddRange(await B.HandleBigFile(config, 10, 200));
             }
 
             return ProcessedFiles;

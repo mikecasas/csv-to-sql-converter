@@ -4,143 +4,156 @@ using System.Text;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace CsvToSqlConverter
 {
     public class SqlContentBuilder
-    {
-        private static int batchNbr = 950;
-
-        public string BuildCreateTable(FileUploadConfig config)
+    {   
+        public async Task<IEnumerable<string>> HandleBigFile(FileUploadConfig config, int filesMax, int rowLimit)
         {
-            string MyFile = $"{config.FolderName}\\{config.FileName}";
+            List<string> Main = new List<string>();
 
-            StringBuilder SqlStatement = new StringBuilder();
-                      
-            string line1 = File.ReadLines(MyFile).First();
-            string TableFields = GetFields(line1, config.AddEmptyField);
+            bool FirstFile = true;
+            int TakeAmount = rowLimit;
 
-            if (config.IncludeDropCreateTable)
+            string line1 = File.ReadLines(config.CompleteFileName).First();
+            string TableFields = SqlHelper.GetFields(line1, config.AddEmptyField);
+
+            var FirstRow = SqlHelper.BuildFirstRow(config.TableName, TableFields);
+            var FR = BuildContent(config.CompleteFileName);
+
+            int Rounds = CalculateLoops(FR.Rows, rowLimit);
+                  
+            if (FR.Rows < rowLimit)
             {
-                SqlStatement.Append(DropCreateTableStatement(config, TableFields));
+                TakeAmount = FR.Rows;
             }
 
-            SqlStatement.Append(ParseContent(MyFile, config.DatabaseName, config.TableName, TableFields));
+            for (int i = 0; i < Rounds; i++)
+            {
+                int SkipAmount = (i * TakeAmount);
 
-            return SqlStatement.ToString();
+                var Items = FR.Content.Skip(SkipAmount).Take(TakeAmount);
+                var Block = TransactionBlock(Items, FirstRow,config.DatabaseName);
+
+                string Content;
+
+                if (FirstFile)
+                {
+                    FirstFile = false;
+                    Content = SqlHelper.DropCreateTableStatement(config,TableFields) + Block;
+                } else
+                {
+                    Content = Block;
+                }
+
+                Main.Add(Content);                              
+              
+            }
+
+            return await ProcessFiles(Main, filesMax, config);
         }
 
-        private static string DropCreateTableStatement(FileUploadConfig config, string tableFields)
+        private async Task<IEnumerable<string>> ProcessFiles(IEnumerable<string> content, int MaxFiles, FileUploadConfig config)
         {
+            var ProcessedFiles = new List<string>();
+
             StringBuilder sb = new StringBuilder();
 
-            sb.AppendLine($"USE {config.DatabaseName}");
-            sb.AppendLine("GO");
-            sb.AppendLine(" ");
+            int ContentBlocks = content.Count();
 
-            sb.AppendLine($"IF EXISTS(SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{config.TableName}') DROP TABLE [{config.TableName}];");
+            if ((ContentBlocks < MaxFiles) || MaxFiles==1)
+            {
+                //Stuff it all in one file
 
-            sb.AppendLine("CREATE TABLE [" + config.TableName + "] ");
-            sb.AppendLine("(");
-            sb.AppendLine(ParseFields(tableFields, config.DefaultFieldType));
-            sb.AppendLine(")");
-            sb.AppendLine("GO");
+                foreach(var i in content)
+                {
+                    sb.Append(i);
+                }
 
-            sb.AppendLine(" ");
+                var FileName = await WriteOut(config.FolderName, config.TableName, null, sb.ToString());
+                ProcessedFiles.Add(FileName);
+            } else
+            {
+                int BlocksInOneFile = CalculateLoops(ContentBlocks, MaxFiles);
+
+                for (int i = 0; i < MaxFiles; i++)
+                {
+                    int SkipAmount = (i * BlocksInOneFile);
+                    var Items = content.Skip(SkipAmount).Take(BlocksInOneFile);
+
+                    foreach (var c in Items)
+                    {
+                        sb.Append(c);
+                    }
+
+                    var FileName2 = await WriteOut(config.FolderName, config.TableName, i, sb.ToString());
+                    ProcessedFiles.Add(FileName2);
+                    sb.Clear();
+                }
+            }
+
+            return ProcessedFiles;
+        }
+
+        [DebuggerStepThrough]
+        private int CalculateLoops(int a, int b)
+        {
+            var Remainder = a % b;
+
+            if (Remainder == 0)
+            {
+                return (a / b);
+            } else
+            {
+                return (a / b) + 1;
+            }          
+        }
+
+        [DebuggerStepThrough]
+        private static string TransactionBlock(IEnumerable<string> rows, string firstRow, string dbName)
+        {
+            bool FirstOne = true;
+
+            StringBuilder sb = new StringBuilder();
+            sb.Append(SqlHelper.UseDb(dbName));
+            sb.AppendLine("BEGIN TRANSACTION;");
+            sb.AppendLine(firstRow);
+
+            foreach (var i in rows)
+            {
+                if (FirstOne)
+                {
+                    sb.AppendLine(i.Replace("UNION ALL ",""));
+                    FirstOne = false;
+                } else
+                {
+                    sb.AppendLine(i);
+                }                
+            }
+
+            sb.AppendLine("COMMIT;");
 
             return sb.ToString();
         }
 
-        private static string GetFields(string firstLine, bool addEmptyColumns)
+        private static Models.FileRead BuildContent(string completeFilePath)
         {
-            StringBuilder Flds = new StringBuilder();
-
-            var flds = firstLine.Split(',');
-            int counter = 0;
-
-            foreach (var i in flds)
-            {
-                if (string.IsNullOrEmpty(i))
-                {
-                    if (addEmptyColumns)
-                    {
-                        Flds.Append($"[empty_field{counter}],");
-                    }
-                }
-                else
-                {
-                    string newName = i.ToLower().Replace(" ", "_").Replace("-", "_");
-
-                    newName = newName.Replace("%", "_percent_");
-                    newName = newName.Replace("\"", "_");
-                    newName = newName.Replace("/", "_");
-                    newName = newName.Replace("$", "_dollar_");
-                    newName = newName.Replace("&", "_and_");
-                    newName = newName.Replace("(", "_");
-                    newName = newName.Replace(")", "_");
-                    newName = newName.Replace("#", "_");
-                    newName = newName.Replace("+", "_plus_");
-
-                    if (newName.StartsWith("_"))
-                    {
-                        newName = newName.Substring(1, newName.Length - 1);
-                    }
-
-                    newName = RemoveEndingUnderScore(newName);
-
-                    Flds.Append($"[{newName}],");
-                }
-
-                counter++;
-            }
-
-            var s = Flds.ToString();
-            var j = s.Substring(0, s.Length - 1);
-
-            return j;
-        }
-
-        private static string ParseFields(string fields, string fieldType)
-        {
-            StringBuilder Flds = new StringBuilder();
-
-            var flds = fields.Split(',');
-
-            foreach (var i in flds)
-            {
-                if (!string.IsNullOrEmpty(i))
-                {
-                    Flds.AppendLine($"{i} {fieldType}, ");
-                }
-            }
-
-            var s = Flds.ToString();
-            var j = s.Substring(0, s.Length - 4);
-
-            return j;
-        }
-
-        private static string ParseContent(string completeFilePath, string dbName, string tableName, string tableFields)
-        {
-            StringBuilder BatchSql = new StringBuilder();                     
-            int cnter = 0;
-            int TotalCounter = 0;
             bool HeaderRow = true;
-            var FirstRow = BuildFirstRow(dbName, tableName, tableFields);
+            List<string> LS = new List<string>();
+            int Counter = 0;
 
             using (Microsoft.VisualBasic.FileIO.TextFieldParser parser = new Microsoft.VisualBasic.FileIO.TextFieldParser(completeFilePath))
             {
                 parser.TextFieldType = Microsoft.VisualBasic.FileIO.FieldType.Delimited;
                 parser.SetDelimiters(",");
 
-                bool FirstRowOfBatch = true;
-
                 while (!parser.EndOfData)
                 {
-                    StringBuilder LS = new StringBuilder();
-
                     string[] fields = parser.ReadFields();
 
+                    //Skip the first row, assuming it's the header row.
                     if (HeaderRow)
                     {
                         HeaderRow = false;
@@ -148,175 +161,34 @@ namespace CsvToSqlConverter
                     }
                     else
                     {
-                        if (FirstRowOfBatch)
-                        {
-                            LS.AppendLine("");
-                            LS.AppendLine(FirstRow);
-                            LS.Append(SelectRow(fields));
-
-                            FirstRowOfBatch = false;
-                        }else
-                        {
-                            LS.Append(" UNION ALL" + SelectRow(fields));
-                        }
-                    }                                       
-
-                    cnter += 1;
-                    TotalCounter += 1;
-
-                    BatchSql.Append(LS);
-
-                    if (cnter == batchNbr)
-                    {
-                        BatchSql.AppendLine($"COMMIT;");
-                        FirstRowOfBatch = true;
-                        cnter = 0;
-
-                        //string jjj = Guid.NewGuid().ToString();
-                        //File.AppendAllText("C:\\Users\\mc\\Desktop\\mike.sql", BatchSql.ToString());
-                        //BatchSql.Clear();
+                        LS.Add(SqlHelper.SelectRow(fields));
                     }
-                }             
-            }
-
-            if((TotalCounter % batchNbr) == 0)
-            {
-                //do nothing, it ends on a good number
-            } else
-            {
-                BatchSql.AppendLine("COMMIT;");
-            }
-
-            return BatchSql.ToString();
-        }
-
-
-        private static string SelectRow(string[] fields)
-        {
-            StringBuilder LS = new StringBuilder();
-
-            LS.Append($" SELECT ");
-            string rowX = Mike(fields);
-            LS.AppendLine($"{rowX}");
-
-            return LS.ToString();
-        }
-
-        private static string BuildFirstRow(string dbName, string tableName, string tableFields)
-        {
-            StringBuilder sb = new StringBuilder();
-
-            //sb.AppendLine($"USE {dbName}");
-            //sb.AppendLine($"GO");
-            sb.AppendLine($"BEGIN TRANSACTION;");
-            sb.Append($"INSERT INTO [{tableName}] ({tableFields})");
-
-            return sb.ToString();
-        }
-
-        private static string Mike(IEnumerable<string> flds)
-        {
-            if (flds == null)
-            {
-                return "";
-            }
-
-            int cntr = 1;
-
-            StringBuilder LocalString = new StringBuilder();
-
-            foreach (string field in flds)
-            {
-                string jj = field.Replace("'", "''");
-                LocalString.Append($"'{jj}' As field{cntr},");
-
-                cntr++;
-            }
-
-            string v = LocalString.ToString();
-            return v.Substring(0, (v.Length - 1));
-        }
-
-        private static string RemoveEndingUnderScore(string fieldName)
-        {
-            if (fieldName == null) return "";
-
-            int counter = 0;
-
-            // this was posted by petebob as well 
-            char[] array = fieldName.ToCharArray();
-            Array.Reverse(array);
-
-            foreach (var i in array)
-            {
-                if (i.Equals('_'))
-                {
-                    counter++;
-                }
-                else
-                {
-                    break;
+                    Counter++;
                 }
             }
 
-            string finalField = fieldName.Substring(0, (fieldName.Length - counter));
-
-            if (string.IsNullOrEmpty(finalField))
+            return new Models.FileRead
             {
-                return "empty_field";
-            }
-            else
-            {
-                return finalField;
-            }
+                Content = LS,
+                Rows = Counter
+            };
         }
 
-        public async Task<IEnumerable<string>> HandleBigFile(FileUploadConfig config)
+        private async Task<string> WriteOut(string folderName, string tableName, int? n, string content)
         {
-            int RowLimit = 15;
-            long LineCount = File.ReadLines(config.CompleteFileName).Count();
-            int FileCounter = 1;
-            StringBuilder SqlStatement = new StringBuilder();
+            string fn;
 
-            bool NeedHeaders = false;
-
-            var ProcessedFiles = new List<string>();
-
-            string line1 = File.ReadLines(config.CompleteFileName).First();
-            string TableFields = GetFields(line1, config.AddEmptyField);
-
-            var sb = ParseContent(config.CompleteFileName, config.DatabaseName, config.TableName, TableFields);
-
-            string[] stringArray = sb.ToString().Split("\r\n").ToArray();
-
-            for (int i = 0; i < stringArray.Length; i++)
+            if (n.HasValue)
             {
-                if (NeedHeaders)
-                {
-                    SqlStatement.AppendLine("88888888888888888");
-                    NeedHeaders = false;
-                }
-
-                string s = stringArray[i];
-
-                SqlStatement.AppendLine(s);
-
-                if (i == (RowLimit*FileCounter))
-                {
-                    SqlStatement.AppendLine("End it here");
-
-                    string fn = $"{config.TableName }-{ FileCounter}";
-
-                    await File.WriteAllTextAsync($"{config.FolderName}\\{fn}.sql", SqlStatement.ToString());
-                    FileCounter++;
-                    SqlStatement.Clear();
-                    ProcessedFiles.Add(fn);
-
-                    NeedHeaders = true;
-                }               
+                fn = $"{tableName }-{n}";
+            }else
+            {
+                fn = $"{tableName }";
             }
+                      
+            await File.WriteAllTextAsync($"{folderName}\\{fn}.sql", content);
 
-            return ProcessedFiles;
+            return fn;
         }
     }
 }
